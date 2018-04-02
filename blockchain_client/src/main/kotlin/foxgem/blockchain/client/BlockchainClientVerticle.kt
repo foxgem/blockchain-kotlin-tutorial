@@ -9,6 +9,7 @@ import io.vertx.ext.web.handler.BodyHandler
 import io.vertx.ext.web.handler.StaticHandler
 import java.security.*
 import java.security.spec.PKCS8EncodedKeySpec
+import java.security.spec.X509EncodedKeySpec
 import java.util.*
 
 class BlockchainClientVerticle : AbstractVerticle() {
@@ -33,10 +34,10 @@ data class Transaction(val senderAddress: String, val senderPrivateKey: String, 
         val signature = Signature.getInstance("SHA256withRSA")
         signature.initSign(this.senderPrivateKey.rsaPrivateKey())
 
-        val data = this.toString().toByteArray()
+        val data = jsonify().toString().toByteArray()
         signature.update(data)
 
-        return Base64.getEncoder().encodeToString(data)
+        return Base64.getEncoder().encodeToString(signature.sign())
     }
 
     fun jsonify() = JsonObject()
