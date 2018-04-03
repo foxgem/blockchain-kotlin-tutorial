@@ -14,6 +14,7 @@ import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.time.Instant
 import java.util.*
+import java.util.concurrent.atomic.AtomicInteger
 
 val MINING_SENDER = "THE BLOCKCHAIN"
 val MINING_REWARD = 1
@@ -231,8 +232,6 @@ class Blockchain {
     }
 
     fun resolveConflic(vertx: Vertx, handler: (Boolean) -> Unit) {
-        var maxLength = this.chain.size
-
         val httpClient = vertx.createHttpClient()
         val futures = mutableListOf<Future<HttpClientResponse>>()
 
@@ -249,22 +248,33 @@ class Blockchain {
 
         CompositeFuture.join(futures as List<Future<HttpClientResponse>>).setHandler { ar ->
             if (ar.succeeded()) {
-                futures.forEach { future ->
-                    if (future.succeeded()) {
-                        future.result().bodyHandler { buffer ->
-                            val body = buffer.toJsonObject()
-                            val chain = body.getJsonArray("chain").map { Block.fromJson(it as JsonObject) }
-                            val length = body.getInteger("length")
+                val count = AtomicInteger(0)
+                var result = false
+                var maxLength = this.chain.size
 
-                            if (length > maxLength && this.validChain(chain)) {
+                futures.forEach { future ->
+                    future.result().bodyHandler { buffer ->
+                        val body = buffer.toJsonObject()
+                        val chain = body.getJsonArray("chain").map { Block.fromJson(it as JsonObject) }
+                        val length = body.getInteger("length")
+
+                        if (length > maxLength && this.validChain(chain)) {
+                            synchronized(this) {
                                 maxLength = length
                                 this.chain = chain as ArrayList<Block>
-                                handler(true)
+                                result = true
                             }
+                        }
+
+                        if (count.incrementAndGet() == futures.size) {
+                            handler(result)
                         }
                     }
                 }
             } else {
+                println("One of requests failsed, cause:")
+                println(ar.cause())
+
                 handler(false)
             }
         }
@@ -294,12 +304,12 @@ class Blockchain {
             if (!validProof(currentBlock.transactions
                     , currentBlock.previousHash.hexStringToByteArray()
                     , currentBlock.nonce)) {
-                currentBlock.transactions.add(reward)
                 return false
-            } else {
-                currentBlock.transactions.add(reward)
             }
 
+            currentBlock.transactions.add(reward)
+
+            lastBlock = currentBlock
             index++
         }
 

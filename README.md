@@ -12,3 +12,16 @@ Run it with the following steps:
 1. gradle shadowjar
 1. java -jar build/libs/blockchain_client-0.0.1-fat.jar
 1. go to "http://localhost:8080/"
+
+## blockchain
+
+Run it with the following steps:
+1. gradle shadowjar
+1. java -jar build/libs/blockchain-0.0.1-fat.jar
+1. go to "http://localhost:5000/"
+
+Also, you can run it with a different port with this command:
+
+~~~
+java -jar -Dport=your-port build/libs/blockchain-0.0.1-fat.jar
+~~~
